@@ -29,6 +29,35 @@ class WaitRoomStatus(Enum):
     LiveStart: 2
     Dissolution: 3
 
+
+class RoomInfo(BaseModel):
+    room_id: int
+    live_id: int
+    joined_user_count: int
+    max_user_count: int
+
+    class Config:
+        orm_mode = True
+
+
+class RoomUser(BaseModel):
+    user_id: int
+    name: str
+    leader_card_id: int
+    select_difficulty: LiveDifficulty
+    is_me: bool
+    is_host: bool
+
+    class Config:
+        orm_mode = True
+
+
+class ResultUser(BaseModel):
+    user_id: int
+    judge_count_list: list[int]
+    score: int
+
+
 class InvalidToken(Exception):
     """指定されたtokenが不正だったときに投げる"""
 
@@ -80,30 +109,23 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
         )
 
 
-class RoomInfo(BaseModel):
-    room_id: int
-    live_id: int
-    joined_user_count: int
-    max_user_count: int
-
-    class Config:
-        orm_mode = True
-
-
-class RoomUser(BaseModel):
-    user_id: int
-    name: str
-    leader_card_id: int
-    select_difficulty: LiveDifficulty
-    is_me: bool
-    is_host: bool
-
-    class Config:
-        orm_mode = True
+def insert_room(token: str, live_id: int, select_difficulty: int) -> str:
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "insert into `room` (owner_token, live_id, select_difficulty, joined_user_count, max_user_count) values (:owner_token, :live_id, :select_difficulty, :joined_user_count, :max_user_count)"
+            ),
+            dict(owner_token=token, live_id=live_id, select_difficulty=select_difficulty, joined_user_count=0, max_user_count=1)
+        )
+        result = conn.execute(
+            text(
+                "select max(id) as last_id from `room`"
+            )
+        )
+        return result.one().last_id
 
 
-class ResultUser(BaseModel):
-    user_id: int
-    judge_count_list: list[int]
-    score: int
+def get_enterable_room_list(live_id: int):
+    pass
+    # return room_info: list[RoomInfo]
 
