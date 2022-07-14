@@ -14,6 +14,6 @@ CREATE TABLE `room` (
   `owner_token` varchar(255) DEFAULT NULL,
   `live_id` INT DEFAULT NULL,
   `select_difficulty` INT DEFAULT NULL,
-  `joined_user_count` INT DEFAULT NULL,
-  `max_user_count` INT DEFAULT NULL
+  `joined_user_count` INT DEFAULT 0,
+  `max_user_count` INT DEFAULT 1
 );

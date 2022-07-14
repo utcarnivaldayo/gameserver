@@ -109,13 +109,13 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
         )
 
 
-def insert_room(token: str, live_id: int, select_difficulty: int) -> str:
+def insert_room(token: str, live_id: int, select_difficulty: int, max_user_count: int) -> int:
     with engine.begin() as conn:
         conn.execute(
             text(
-                "insert into `room` (owner_token, live_id, select_difficulty, joined_user_count, max_user_count) values (:owner_token, :live_id, :select_difficulty, :joined_user_count, :max_user_count)"
+                "insert into `room` (owner_token, live_id, select_difficulty, max_user_count) values (:owner_token, :live_id, :select_difficulty, :max_user_count)"
             ),
-            dict(owner_token=token, live_id=live_id, select_difficulty=select_difficulty, joined_user_count=0, max_user_count=1)
+            dict(owner_token=token, live_id=live_id, select_difficulty=select_difficulty, max_user_count=max_user_count)
         )
         result = conn.execute(
             text(
@@ -125,7 +125,15 @@ def insert_room(token: str, live_id: int, select_difficulty: int) -> str:
         return result.one().last_id
 
 
-def get_enterable_room_list(live_id: int):
-    pass
-    # return room_info: list[RoomInfo]
-
+def get_enterable_room_list(live_id: int) -> list[RoomInfo]:
+    room_info_list: list[RoomInfo] = []
+    with engine.begin() as conn:
+        query: str = "select * from `room`" if live_id == 0 else "select * from `room` where `live_id` = :live_id"
+        result = conn.execute(
+            text(
+                query
+            ),
+            dict(live_id=live_id)
+        )
+        print(result.all())
+    return room_info_list
