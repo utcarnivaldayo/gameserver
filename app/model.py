@@ -1,5 +1,6 @@
 from ctypes import Union
 import json
+from os import stat
 from tkinter import N
 from unittest import result
 import uuid
@@ -196,5 +197,38 @@ def join_selected_room(token: str, room_id: int, select_difficulty: LiveDifficul
         return JoinRoomResult.Ok
 
 
-def wait_selected_room(room_id: int):
-    pass
+def wait_selected_room(token: str, room_id: int):
+    
+    with engine.begin() as conn:
+        
+        # room status
+        result_room = conn.execute(
+            text(
+                "select status, owner_token from `room` where `id`=:id"
+            ),
+            dict(id=room_id)
+        )
+        room = result_room.one()
+        if room is None:
+            return
+
+        # room user
+        result_room_user_list = conn.execute(
+            text(
+                "select room_user.user_id, room_user.select_difficulty, user.token, user.name, user.leader_card_id from `room_user` inner join `user` on room_user.user_id = user.id where `room_id` = :room_id"
+            ),
+            dict(room_id=room_id)
+        )
+        room_user_list = result_room_user_list.all()
+        if room_user_list is None:
+            return
+
+        # mapping RoomUser
+        list_room_user: list[RoomUser] = []
+        for item in room_user_list:
+            list_room_user.append(RoomUser(user_id=item.room_user.user_id, name=item.user.name, leader_card_id=item.user.leader_card_id, select_difficulty=item.room_user.select_difficulty, is_me=True if token == item.user.token else False, is_host=True if token == room.owner_token else False))
+        
+        print(list_room_user)
+        return (room.status, list_room_user)
+
+
