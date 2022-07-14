@@ -1,4 +1,6 @@
+from ctypes import Union
 import json
+from tkinter import N
 from unittest import result
 import uuid
 from enum import Enum, IntEnum
@@ -12,22 +14,22 @@ from sqlalchemy.exc import NoResultFound
 from .db import engine
 
 
-class LiveDifficulty(Enum):
-    normal: 1
-    hard: 2
+class LiveDifficulty(IntEnum):
+    normal = 1
+    hard = 2
 
 
-class JoinRoomResult(Enum):
-    Ok: 1
-    RoomFull: 2
-    Disbanded: 3
-    OtherError: 4
+class JoinRoomResult(IntEnum):
+    Ok = 1
+    RoomFull = 2
+    Disbanded = 3
+    OtherError = 4
 
 
-class WaitRoomStatus(Enum):
-    Waiting: 1
-    LiveStart: 2
-    Dissolution: 3
+class WaitRoomStatus(IntEnum):
+    Waiting = 1
+    LiveStart = 2
+    Dissolution = 3
 
 
 class RoomInfo(BaseModel):
@@ -44,7 +46,7 @@ class RoomUser(BaseModel):
     user_id: int
     name: str
     leader_card_id: int
-    select_difficulty: LiveDifficulty
+    select_difficulty: int
     is_me: bool
     is_host: bool
 
@@ -111,29 +113,88 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
 
 def insert_room(token: str, live_id: int, select_difficulty: int, max_user_count: int) -> int:
     with engine.begin() as conn:
-        conn.execute(
+        result = conn.execute(
             text(
                 "insert into `room` (owner_token, live_id, select_difficulty, max_user_count) values (:owner_token, :live_id, :select_difficulty, :max_user_count)"
             ),
             dict(owner_token=token, live_id=live_id, select_difficulty=select_difficulty, max_user_count=max_user_count)
         )
-        result = conn.execute(
-            text(
-                "select max(id) as last_id from `room`"
-            )
-        )
-        return result.one().last_id
+        return result.lastrowid
 
 
 def get_enterable_room_list(live_id: int) -> list[RoomInfo]:
-    room_info_list: list[RoomInfo] = []
+    
     with engine.begin() as conn:
-        query: str = "select * from `room`" if live_id == 0 else "select * from `room` where `live_id` = :live_id"
+        query: str = "select * from `room` where `joined_user_count` < `max_user_count`" if live_id == 0 else "select * from `room` where `live_id` = :live_id and `joined_user_count` < `max_user_count`"
         result = conn.execute(
             text(
                 query
             ),
             dict(live_id=live_id)
         )
-        print(result.all())
+        room_info_list: list[RoomInfo] = []
+        for item in result.all():
+            room_info_list.append(RoomInfo(room_id=item.id, live_id=item.live_id, joined_user_count=item.joined_user_count, max_user_count=item.max_user_count))
+        
+        print(room_info_list)
     return room_info_list
+
+
+def join_selected_room(token: str, room_id: int, select_difficulty: LiveDifficulty) -> JoinRoomResult:
+
+    with engine.begin() as conn:
+        # Todo disbunded
+
+        # Check Error
+        result_room_condition = conn.execute(
+            text(
+                "select id, joined_user_count, max_user_count, status from `room` where `id` = :id and `select_difficulty` = :select_difficulty"
+            ),
+            dict(id=room_id, select_difficulty=select_difficulty)
+        )
+        
+        room_conditions = result_room_condition.all()
+        if room_conditions is None:
+            return JoinRoomResult.OtherError
+
+        room_empty_list = [condition.joined_user_count < condition.max_user_count for condition in room_conditions]
+        if not any(room_empty_list):
+            return JoinRoomResult.RoomFull
+
+        room_disbanded_list = [condition.status == WaitRoomStatus.Waiting for condition in room_conditions]
+        if not any(room_disbanded_list):
+            return JoinRoomResult.Disbanded
+
+        vaild_index = 0
+        for i in range(len(room_conditions)):
+            if room_empty_list[i] and room_disbanded_list[i]:
+                vaild_index = i
+
+        # OK
+        conn.execute(
+            text(
+                "update `room` set `joined_user_count` = `joined_user_count` + 1 where `id` = :id" 
+            ),
+            dict(id=room_conditions[vaild_index].id)
+        )
+        result_user = conn.execute(
+            text(
+                "select id from `user` where `token` = :token"
+            ),
+            dict(token=token)
+        )
+        user = result_user.one()
+        if user is None:
+            return JoinRoomResult.OtherError
+
+        conn.execute(
+            text(
+                "insert into `room_user` ( room_id, user_id, select_difficulty) values (:room_id, :user_id, :select_difficulty)"
+            ),
+            dict(room_id=room_conditions[vaild_index].id, user_id=user.id, select_difficulty=select_difficulty)
+        )
+        return JoinRoomResult.Ok
+
+
+def wait_selected_room(room_id: int):
+    pass
