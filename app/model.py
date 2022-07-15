@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import NoResultFound
+from traitlets import default
 
 from .db import engine
 
@@ -304,3 +305,50 @@ def end_live(token: str, room_id: int, judge_count_list: list[int], score: int):
                 ),
                 dict(room_id=room_id, user_id=user.id, list_index=i, count=judge_count_list[i])
             )
+
+
+def result_live(room_id: int, judge_count_length: int) -> list[ResultUser]:  
+
+    with engine.begin() as conn:
+        
+        # room_user -> user_id
+        result_room_users = conn.execute(
+            text(
+                "select user_id, score from `room_user` where `room_id`=:room_id"
+            ),
+            dict(room_id=room_id)
+        )
+        room_users = result_room_users.all()
+
+        # room_user_judge_count
+        list_result_user: list[ResultUser] = []
+        for i, item in enumerate(room_users):
+            list_result_user.append(ResultUser(user_id=item.user_id, judge_count_list=[], score=item.score))
+            for j in range(judge_count_length):
+                result_room_user_judge_count = conn.execute(
+                    text(
+                        "select count from `room_user_judge_count` where `room_id`=:room_id and `user_id`=:user_id and `list_index`=:list_index"
+                    ),
+                    dict(room_id=room_id, user_id=item.user_id, list_index=j)
+                )
+                room_user_judge_count = result_room_user_judge_count.one_or_none()
+
+                if room_user_judge_count is None:
+                    print(f"count is None (user_id: {item.user_id}, index: {j})")
+                    return []
+
+                list_result_user[i].judge_count_list.append(room_user_judge_count.count)
+
+        if len(list_result_user) != len(room_users):
+            return []
+
+        # update room state
+        conn.execute(
+            text(
+                "update `room` set `status` = 3 where `id` = :id"
+            ),
+            dict(id=room_id)
+        )
+
+        return list_result_user
+
