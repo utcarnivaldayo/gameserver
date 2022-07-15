@@ -138,3 +138,14 @@ class RoomStartRequest(BaseModel):
 @app.post("/room/start")
 def start_room(req: RoomStartRequest, token: str = Depends(get_auth_token)):
     model.start_live(token, req.room_id)
+
+
+class RoomEndRequest(BaseModel):
+    room_id: int
+    judge_count_list: list[int]
+    score: int
+
+
+@app.post("/room/end")
+def end_room(req: RoomEndRequest, token: str = Depends(get_auth_token)):
+    model.end_live(token, req.room_id, req.judge_count_list, req.score)

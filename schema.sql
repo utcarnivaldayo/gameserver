@@ -27,3 +27,12 @@ CREATE TABLE `room_user` (
   `score` INT NOT NULL DEFAULT 0,
   PRIMARY KEY (`room_id`, `user_id`)
 );
+
+DROP TABLE IF EXISTS `room_user_judge_count`;
+CREATE TABLE `room_user_judge_count` (
+  `room_id` bigint NOT NULL,
+  `user_id` bigint NOT NULL,
+  `list_index` INT NOT NULL DEFAULT 0,
+  `count` INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`room_id`, `user_id`, `list_index`)
+);

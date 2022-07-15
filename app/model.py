@@ -265,3 +265,42 @@ def start_live(token: str, room_id: int):
         )
         print("update room status -> '2'")
 
+
+def end_live(token: str, room_id: int, judge_count_list: list[int], score: int):
+    with engine.begin() as conn:
+
+        # user_id 
+        result_user = conn.execute(
+            text(
+                "select id from `user` where `token` = :token"
+            ),
+            dict(token=token)
+        )
+        user = result_user.one()
+        if user is None:
+            return
+
+        # room_user -> update score
+        conn.execute(
+            text(
+                "update `room_user` set `score` = :score where `room_id` = :room_id and `user_id` = :user_id"
+            ),
+            dict(score=score, room_id=room_id, user_id=user.id)
+        )
+
+        # room_user_judge_count -> insert
+        """
+        conn.execute(
+            text(
+                "insert into `room_user_judge_count` ( room_id, user_id, list_index, count) values (:room_id, :user_id, :list_index, :count)"
+            ),
+            dict(room_id=room_id, user_id=user.id, list_index=0, count=judge_count_list[0])
+        )
+        """
+        for i in range(len(judge_count_list)):
+            conn.execute(
+                text(
+                    "insert into `room_user_judge_count` ( room_id, user_id, list_index, count) values (:room_id, :user_id, :list_index, :count)"
+                ),
+                dict(room_id=room_id, user_id=user.id, list_index=i, count=judge_count_list[i])
+            )
