@@ -226,7 +226,7 @@ def wait_selected_room(token: str, room_id: int):
         # mapping RoomUser
         list_room_user: list[RoomUser] = []
         for item in room_user_list:
-            list_room_user.append(RoomUser(user_id=item.room_user.user_id, name=item.user.name, leader_card_id=item.user.leader_card_id, select_difficulty=item.room_user.select_difficulty, is_me=True if token == item.user.token else False, is_host=True if token == room.owner_token else False))
+            list_room_user.append(RoomUser(user_id=item.user_id, name=item.name, leader_card_id=item.leader_card_id, select_difficulty=item.select_difficulty, is_me=True if token == item.token else False, is_host=True if token == room.owner_token else False))
         
         print(list_room_user)
         return (room.status, list_room_user)
