@@ -226,9 +226,42 @@ def wait_selected_room(token: str, room_id: int):
         # mapping RoomUser
         list_room_user: list[RoomUser] = []
         for item in room_user_list:
-            list_room_user.append(RoomUser(user_id=item.user_id, name=item.name, leader_card_id=item.leader_card_id, select_difficulty=item.select_difficulty, is_me=True if token == item.token else False, is_host=True if token == room.owner_token else False))
+            list_room_user.append(RoomUser(user_id=item.user_id, name=item.name, leader_card_id=item.leader_card_id, select_difficulty=item.select_difficulty, is_me=True if token == item.token else False, is_host=True if item.token == room.owner_token else False))
         
         print(list_room_user)
         return (room.status, list_room_user)
 
+
+def start_live(token: str, room_id: int):
+    with engine.begin() as conn:
+
+        # condition check 
+        result_condition = conn.execute(
+            text(
+                "select owner_token, joined_user_count, max_user_count from `room` where `id`=:id"
+            ),
+            dict(id=room_id)
+        )
+        condition = result_condition.one()
+        if condition is None:
+            return
+
+        # リクエストを送った人とルームホストのトークンが異なる
+        if condition.owner_token != token:
+            print("start live -> token error.")
+            return
+
+        # ルームの人数確認
+        if condition.joined_user_count != condition.max_user_count:
+            print("start live -> user_count error.")
+            return
+
+        # update state
+        conn.execute(
+            text(
+                "update `room` set `status` = 2 where `id`=:id"
+            ),
+            dict(id=room_id)
+        )
+        print("update room status -> '2'")
 
